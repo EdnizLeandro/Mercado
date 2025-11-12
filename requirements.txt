@@ -8,3 +8,4 @@ plotly
 statsmodels
 tensorflow
 xgboost
+prophet
