@@ -5,7 +5,7 @@ from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 
 # ==========================================
-# Classe original adaptada (sem prints)
+# Classe principal
 # ==========================================
 class MercadoTrabalhoPredictor:
     def __init__(self, filepath, codigos_filepath):
@@ -60,7 +60,7 @@ class MercadoTrabalhoPredictor:
         if not self.cleaned:
             return None, None
 
-        df_cbo = self.df[self.df[self.coluna_cbo].astype(str) == cbo_codigo].copy()
+        df_cbo = self.df[self.df[self.coluna_cbo].astype(str) == str(cbo_codigo)].copy()
         if df_cbo.empty:
             return None, None
 
@@ -95,14 +95,14 @@ st.title("📊 Previsão do Mercado de Trabalho")
 st.markdown("Analise tendências salariais e de emprego com base nos dados do CAGED/CBO.")
 
 # Uploads
-dados_file = st.file_uploader("dados.parquet)", type=["parquet"])
-codigos_file = st.file_uploader("cbo.xlsx)", type=["xlsx"])
+dados_file = st.file_uploader("Envie o arquivo de dados (.parquet)", type=["parquet"])
+codigos_file = st.file_uploader("Envie o arquivo de CBO (.xlsx)", type=["xlsx"])
 
 if dados_file and codigos_file:
-    app = MercadoTrabalhoPredictor(dados_file, codigos_file)
-    app.carregar_dados()
-    app.limpar_dados()
-
+    with st.spinner("Carregando e preparando dados..."):
+        app = MercadoTrabalhoPredictor(dados_file, codigos_file)
+        app.carregar_dados()
+        app.limpar_dados()
     st.success("✅ Dados carregados e preparados!")
 
     busca = st.text_input("🔍 Digite o nome ou código da profissão:")
@@ -111,7 +111,10 @@ if dados_file and codigos_file:
         if resultados.empty:
             st.warning("Nenhuma profissão encontrada.")
         else:
-            cbo_opcao = st.selectbox("Selecione o CBO:", resultados['cbo_codigo'] + " - " + resultados['cbo_descricao'])
+            cbo_opcao = st.selectbox(
+                "Selecione o CBO:",
+                resultados['cbo_codigo'] + " - " + resultados['cbo_descricao']
+            )
             cbo_codigo = cbo_opcao.split(" - ")[0]
 
             if st.button("Gerar Previsão"):
