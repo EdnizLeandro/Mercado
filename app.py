@@ -1,166 +1,129 @@
-# ============================================================
-#  EPIDEMIOLOGIA COVID-19 – MODELOS SIR/SEIR + MACHINE LEARNING
-#  Autor: (Seu Nome)
-#  Data: 2025
-# ============================================================
-
-# ----------------------
-# IMPORTAÇÕES
-# ----------------------
+import streamlit as st
 import pandas as pd
+import plotly.express as px
+from prophet import Prophet
+import plotly.graph_objects as go
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy.integrate import odeint
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error, r2_score
+import os
 
-# ----------------------
-# CONFIGURAÇÕES DE GRÁFICO
-# ----------------------
-plt.rcParams["figure.figsize"] = (12, 6)
-plt.rcParams["font.size"] = 12
+st.set_page_config(page_title="Plataforma Jovem Futuro", layout="wide")
 
-# ----------------------
-# 1. LEITURA DO ARQUIVO PARQUET
-# ----------------------
-file_path = "dados_tratados.parquet"   # altere aqui
+# ======================================================
+# 1) Carregar arquivos principais com tratamento de erro
+# ======================================================
+PARQUET_FILE = "dados.parquet"
+CBO_FILE = "cbo.xlsx"
 
-print("📂 Carregando dados...")
-df = pd.read_parquet(file_path)
+def load_data():
+    # Verificar parquet
+    if not os.path.exists(PARQUET_FILE):
+        st.error(f"❌ Arquivo não encontrado: **{PARQUET_FILE}**")
+        st.stop()
 
-print("Colunas encontradas:")
-print(df.columns)
+    # Verificar cbo
+    if not os.path.exists(CBO_FILE):
+        st.error(f"❌ Arquivo não encontrado: **{CBO_FILE}**")
+        st.stop()
 
-# ----------------------
-# 2. PRÉ–PROCESSAMENTO E FILTRAGEM (2020–2024)
-# ----------------------
-df["data"] = pd.to_datetime(df["data"])
-df = df.sort_values("data")
+    df = pd.read_parquet(PARQUET_FILE)
 
-df_periodo = df[(df["data"].dt.year >= 2020) & (df["data"].dt.year <= 2024)]
+    df_cbo = pd.read_excel(CBO_FILE)
+    df_cbo.columns = ["codigo", "descricao"]
 
-# Exemplo: analisar o Brasil inteiro (soma por dia)
-df_br = df_periodo.groupby("data").agg({
-    "casosnovos": "sum",
-    "obitosnovos": "sum",
-    "populacaotcu2019": "sum"
-}).reset_index()
+    return df, df_cbo
 
-df_br["infectados"] = df_br["casosnovos"].cumsum()
-df_br["recuperados"] = df_br["infectados"] * 0.92
-df_br["susceptiveis"] = df_br["populacaotcu2019"] - df_br["infectados"]
 
-# ----------------------
-# 3. MODELO SIR
-# ----------------------
+df, df_cbo = load_data()
 
-def sir_model(y, t, beta, gamma, N):
-    S, I, R = y
-    dSdt = -beta * S * I / N
-    dIdt = beta * S * I / N - gamma * I
-    dRdt = gamma * I
-    return [dSdt, dIdt, dRdt]
+st.success("✅ Dados carregados com sucesso!")
+st.write("### Colunas detectadas no dataset:")
+st.json(list(df.columns))
 
-# Valores iniciais
-N = df_br["populacaotcu2019"].iloc[0]
-I0 = df_br["infectados"].iloc[0] + 1
-R0 = 0
-S0 = N - I0
-beta = 0.22
-gamma = 0.085
 
-t = np.arange(len(df_br))
+# ======================================================
+# Normalização das colunas esperadas
+# ======================================================
 
-res_sir = odeint(sir_model, [S0, I0, R0], t, args=(beta, gamma, N))
-S, I, R = res_sir.T
+COLUMN_MAP = {
+    "cbo": "cbo2002ocupacao",
+    "date": "competenciadec",
+    "salary": "salario",
+    "saldo": "saldomovimentacao"
+}
 
-# ----------------------
-# 4. MODELO SEIR
-# ----------------------
+for alias, realname in COLUMN_MAP.items():
+    if realname not in df.columns:
+        st.error(f"❌ Coluna obrigatória não encontrada: **{realname}**")
+        st.stop()
 
-def seir_model(y, t, beta, sigma, gamma, N):
-    S, E, I, R = y
-    dSdt = -beta * S * I / N
-    dEdt = beta * S * I / N - sigma * E
-    dIdt = sigma * E - gamma * I
-    dRdt = gamma * I
-    return [dSdt, dEdt, dIdt, dRdt]
+df["competenciadec"] = pd.to_datetime(df["competenciadec"], errors="coerce")
 
-sigma = 1/5.2   # período médio de incubação
-E0 = 100
-y0_seir = [S0, E0, I0, 0]
 
-res_seir = odeint(seir_model, y0_seir, t, args=(beta, sigma, gamma, N))
-S2, E2, I2, R2 = res_seir.T
+# ======================================================
+# Busca por profissão (CBO)
+# ======================================================
+st.header("🔎 Buscar profissão (por nome ou código CBO)")
 
-# ----------------------
-# 5. MACHINE LEARNING – PREVISÃO DE CASOS
-# ----------------------
+query = st.text_input("Digite nome ou código da profissão:")
 
-df_ml = df_br.copy()
-df_ml["dia"] = np.arange(len(df_ml))
+if query:
+    # Filtro seguro
+    mask = (
+        df_cbo["descricao"].str.contains(query, case=False, na=False)
+        | df_cbo["codigo"].astype(str).str.contains(query, na=False)
+    )
 
-X = df_ml[["dia"]]
-y = df_ml["casosnovos"]
+    resultados = df_cbo[mask]
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+    if resultados.empty:
+        st.warning("Nenhuma profissão encontrada.")
+    else:
+        st.write("### Resultados encontrados:")
+        st.dataframe(resultados)
 
-modelo = RandomForestRegressor(n_estimators=300, random_state=42)
-modelo.fit(X_train, y_train)
+        # Selecionar profissão
+        selected_code = st.selectbox(
+            "Selecione um código CBO para análise:",
+            resultados["codigo"].astype(str).unique()
+        )
 
-pred = modelo.predict(X_test)
+        if selected_code:
+            st.info(f"📌 Mostrando análise para CBO **{selected_code}**")
 
-mae = mean_absolute_error(y_test, pred)
-r2 = r2_score(y_test, pred)
+            df_job = df[df["cbo2002ocupacao"].astype(str) == selected_code]
 
-print("\n📊 RESULTADOS ML:")
-print(f"MAE = {mae:.2f}")
-print(f"R²  = {r2:.3f}")
+            if df_job.empty:
+                st.warning("Não existem registros para este CBO nos dados.")
+            else:
+                st.write("### 📊 Distribuição salarial")
+                fig = px.box(df_job, x="cbo2002ocupacao", y="salario")
+                st.plotly_chart(fig, use_container_width=True)
 
-# Previsão dos próximos 60 dias
-dias_futuros = np.arange(len(df_ml), len(df_ml) + 60)
-pred_futuro = modelo.predict(pd.DataFrame({"dia": dias_futuros}))
+                st.write("### 📈 Evolução do saldo de contratações")
+                fig2 = px.line(df_job, x="competenciadec", y="saldomovimentacao")
+                st.plotly_chart(fig2, use_container_width=True)
 
-# ----------------------
-# 6. GRÁFICOS
-# ----------------------
+                # ======================================
+                # 3) PREVISÃO (ML) — Prophet
+                # ======================================
+                st.subheader("🤖 Previsão de demanda futura (Prophet)")
 
-# ----- SIR -----
-plt.plot(df_br["data"], df_br["infectados"], label="Infectados Reais")
-plt.plot(df_br["data"], I, label="Modelo SIR – Infectados")
-plt.title("Modelo SIR – Brasil (2020–2024)")
-plt.xlabel("Data")
-plt.ylabel("Casos")
-plt.legend()
-plt.grid()
-plt.show()
+                df_prophet = df_job[["competenciadec", "saldomovimentacao"]].rename(
+                    columns={"competenciadec": "ds", "saldomovimentacao": "y"}
+                ).dropna()
 
-# ----- SEIR -----
-plt.plot(df_br["data"], I2, label="Modelo SEIR – Infectados")
-plt.plot(df_br["data"], E2, label="Expostos (SEIR)")
-plt.title("Modelo SEIR – Brasil (2020–2024)")
-plt.xlabel("Data")
-plt.ylabel("Casos")
-plt.legend()
-plt.grid()
-plt.show()
+                if len(df_prophet) >= 12:
+                    model = Prophet()
+                    model.fit(df_prophet)
 
-# ----- ML -----
-plt.plot(df_br["data"].iloc[len(X_train):], y_test, label="Real")
-plt.plot(df_br["data"].iloc[len(X_train):], pred, label="Previsão")
-plt.title("Machine Learning – Random Forest")
-plt.xlabel("Data")
-plt.ylabel("Casos Novos")
-plt.legend()
-plt.grid()
-plt.show()
+                    future = model.make_future_dataframe(periods=12, freq="M")
+                    forecast = model.predict(future)
 
-# ----- Previsão Futura -----
-plt.plot(dias_futuros, pred_futuro, label="Previsão 60 dias")
-plt.title("Previsão de Casos – 60 dias")
-plt.xlabel("Dias Futuros")
-plt.ylabel("Casos Previstos")
-plt.legend()
-plt.grid()
-plt.show()
+                    fig3 = model.plot(forecast)
+                    st.pyplot(fig3)
+
+                    st.write("### 🔮 Previsão numérica dos próximos 12 meses")
+                    st.dataframe(forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(12))
+
+                else:
+                    st.warning("Dados insuficientes para previsão.")
