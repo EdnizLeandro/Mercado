@@ -11,6 +11,12 @@ class MercadoTrabalhoPredictor:
         self.df_codigos = None
         self.cleaned = False
 
+    def formatar_moeda(self, valor):
+        try:
+            return f"{float(valor):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        except Exception:
+            return str(valor)
+
     def carregar_dados(self):
         dfs = [pd.read_csv(path, encoding='utf-8', sep=';', on_bad_lines='skip') for path in self.csv_files]
         self.df = pd.concat(dfs, ignore_index=True)
@@ -84,7 +90,7 @@ class MercadoTrabalhoPredictor:
             st.write(f"Saldo total de movimentação: {saldo_total:+,.0f} postos de trabalho  →  **{status}**")
 
         # --- PREVISÃO SALARIAL ---
-        st.subheader("Previsão Salarial")
+        st.subheader("Previsão Salarial (próximos anos)")
         df_cbo[col_salario] = pd.to_numeric(df_cbo[col_salario].astype(str).str.replace(",",".").str.replace(" ",""), errors="coerce")
         df_cbo = df_cbo.dropna(subset=[col_salario])
         df_cbo[col_data] = pd.to_datetime(df_cbo[col_data], errors='coerce')
