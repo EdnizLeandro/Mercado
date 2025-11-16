@@ -11,7 +11,7 @@ Conectamos talentos a oportunidades reais de **trabalho, educação e renda**, p
 O **Jobin** é uma plataforma social e tecnológica que conecta jovens a oportunidades de **emprego, educação e geração de renda**.  
 O módulo **Analytics & Mercado** utiliza **dados, indicadores e inteligência analítica** para compreender o mercado local e impulsionar decisões que ampliam o impacto social do Jobin.
 
----
+
 
 ## 🎯 Objetivos
 
