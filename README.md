@@ -4,7 +4,7 @@
 **Jobin – Analytics & Mercado:** iniciativa que transforma a vida de jovens em Recife por meio de dados e inteligência de mercado.  
 Conectamos talentos a oportunidades reais de **trabalho, educação e renda**, promovendo **inclusão, acessibilidade e impacto social** com uma plataforma humana e voltada ao futuro.
 
----
+
 
 ## 🚀 Sobre o Projeto
 
@@ -20,12 +20,12 @@ O módulo **Analytics & Mercado** utiliza **dados, indicadores e inteligência a
 - Promover **inclusão socioeconômica** por meio de informações acessíveis;  
 - Impulsionar o **desenvolvimento pessoal e profissional** de jovens.
 
----
+
 
 ## 🧠 Tecnologias Utilizadas
 
 | Categoria | Ferramentas |
 |------------|--------------|
-| **Análise de Dados** | Python · Pandas · NumPy |
+| **Análise de Dados** | Python · Pandas · NumPy · etc |
 | **Visualização** | streamlit |
-| **Banco de Dados** | SQL  |
+
