@@ -1,205 +1,124 @@
+# app.py
 import pandas as pd
-import numpy as np
-from sklearn.linear_model import LinearRegression
 import streamlit as st
+from unidecode import unidecode
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from xgboost import XGBRegressor
+import numpy as np
 
-# ---------------------------------------------------------
-#                CARREGAR E PREPARAR DADOS
-# ---------------------------------------------------------
-
+# ---------------------------------------
+# Funções auxiliares
+# ---------------------------------------
 @st.cache_data
-def carregar_dados():
+def carregar_historico():
     df = pd.read_parquet("dados.parquet")
-
-    # Renomear colunas CAGED
-    df = df.rename(columns={
-        "competênciamov": "competenciamov",
-        "saldomovimentação": "saldomovimentacao",
-        "cbo2002ocupação": "cbo2002ocupacao",
-        "salário": "salario"
-    })
-
+    df.columns = [unidecode(c.lower()).replace(" ", "") for c in df.columns]
     df["cbo2002ocupacao"] = df["cbo2002ocupacao"].astype(str).str.strip()
-
-    # Conversão de salário
-    df["salario"] = (
-        df["salario"]
-        .astype(str)
-        .str.replace(",", ".", regex=False)
-    )
-    df["salario"] = pd.to_numeric(df["salario"], errors="coerce")
-
-    mediana_sal = df["salario"].median()
-    df["salario"] = df["salario"].fillna(mediana_sal)
-
+    df["salario"] = pd.to_numeric(df["salario"], errors='coerce')
     return df
-
 
 @st.cache_data
 def carregar_cbo():
-    df = pd.read_excel("cbo.xlsx")
-    df.columns = ["cbo_codigo", "cbo_descricao"]
-    df["cbo_codigo"] = df["cbo_codigo"].astype(str).str.strip()
-    df["cbo_descricao"] = df["cbo_descricao"].astype(str).str.strip()
-    return df
+    df_cbo = pd.read_excel("cbo.xlsx")
+    df_cbo.columns = [unidecode(c.lower()).replace(" ", "") for c in df_cbo.columns]
+    df_cbo["descricao"] = df_cbo["descricao"].astype(str)
+    df_cbo["codigo"] = df_cbo["codigo"].astype(str)
+    return df_cbo
 
+def busca_profissao(df_cbo, termo):
+    termo_norm = unidecode(termo.lower())
+    df_cbo["descricao_norm"] = df_cbo["descricao"].apply(lambda x: unidecode(str(x).lower()))
+    df_filtrada = df_cbo[df_cbo["descricao_norm"].str.contains(termo_norm)]
+    return df_filtrada
 
-df = carregar_dados()
+def treinar_modelo_salario(df_prof):
+    X = df_prof[["idade", "horascontratuais"]].fillna(0)
+    y = df_prof["salario"].fillna(0)
+    if len(X) < 10:
+        return None  # dados insuficientes
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    model = XGBRegressor(n_estimators=100, max_depth=3, random_state=42)
+    model.fit(X_train, y_train)
+    return model
+
+def prever_salario(model, anos_futuro, idade_atual, horas):
+    X_new = pd.DataFrame({"idade": [idade_atual + anos_futuro], "horascontratuais": [horas]})
+    return model.predict(X_new)[0]
+
+def treinar_modelo_vagas(df_prof):
+    df_prof["saldomovimentacao"] = pd.to_numeric(df_prof["saldomovimentacao"], errors='coerce').fillna(0)
+    X = df_prof[["idade", "horascontratuais"]].fillna(0)
+    y = df_prof["saldomovimentacao"]
+    if len(X) < 10:
+        return None
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    model = XGBRegressor(n_estimators=100, max_depth=3, random_state=42)
+    model.fit(X_train, y_train)
+    return model
+
+def prever_vagas(model, anos_futuro, idade_atual, horas):
+    X_new = pd.DataFrame({"idade": [idade_atual + anos_futuro], "horascontratuais": [horas]})
+    return model.predict(X_new)[0]
+
+def rank_profissoes(df_hist):
+    resumo = df_hist.groupby("cbo2002ocupacao")["salario"].mean().sort_values(ascending=False)
+    return resumo.head(10)
+
+# ---------------------------------------
+# Aplicativo Streamlit
+# ---------------------------------------
+st.set_page_config(page_title="Mercado de Trabalho", layout="wide")
+
+st.title("📊 Previsão Salarial e Tendência de Mercado")
+
+df_hist = carregar_historico()
 df_cbo = carregar_cbo()
 
+# Input do usuário
+termo = st.text_input("Digite o nome ou código da profissão:")
 
-# ---------------------------------------------------------
-#                  FORMATAR MOEDA
-# ---------------------------------------------------------
-
-def formatar_moeda(v):
-    try:
-        return f"{float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    except:
-        return v
-
-
-# ---------------------------------------------------------
-#             FUNÇÃO PARA BUSCAR PROFISSÃO
-# ---------------------------------------------------------
-
-def buscar_profissao(entrada: str):
-    entrada = entrada.strip().lower()
-
-    if entrada.isdigit():
-        resultado = df_cbo[df_cbo["cbo_codigo"] == entrada]
-        return resultado
-
-    # busca textual simples (sem unidecode)
-    resultado = df_cbo[
-        df_cbo["cbo_descricao"].str.lower().str.contains(entrada, na=False)
-    ]
-    return resultado
-
-
-# ---------------------------------------------------------
-#            RELATÓRIO COMPLETO DA PROFISSÃO
-# ---------------------------------------------------------
-
-def relatorio(cbo_codigo):
-
-    st.subheader("📌 Relatório Completo da Profissão")
-
-    info = df_cbo[df_cbo["cbo_codigo"] == cbo_codigo]
-
-    if info.empty:
-        st.error("Profissão não encontrada na tabela CBO.")
-        return
-
-    nome = info.iloc[0]["cbo_descricao"]
-    st.markdown(f"## **{nome}**")
-
-    # Filtrar dados do CBO escolhido
-    dfx = df[df["cbo2002ocupacao"] == cbo_codigo].copy()
-
-    if dfx.empty:
-        st.warning("Sem dados suficientes no CAGED para gerar previsões.")
-        return
-
-    # -------------------------------
-    # SALÁRIO ATUAL
-    # -------------------------------
-    salario_atual = dfx["salario"].mean()
-    st.write(f"**Salário médio atual:** R$ {formatar_moeda(salario_atual)}")
-
-    # -------------------------------
-    # PREPARAR BASE TEMPORAL
-    # -------------------------------
-    dfx["competenciamov"] = pd.to_datetime(dfx["competenciamov"], errors="coerce")
-    dfx = dfx.dropna(subset=["competenciamov"])
-
-    dfx["mes"] = (dfx["competenciamov"].dt.year - 2020) * 12 + dfx["competenciamov"].dt.month
-
-    df_mensal = dfx.groupby("mes")["salario"].mean().reset_index()
-
-    # -------------------------------
-    # PREVISÃO DE SALÁRIO
-    # -------------------------------
-
-    if len(df_mensal) < 2:
-        st.warning("Sem dados suficientes para previsão salarial.")
+if termo:
+    df_opcoes = busca_profissao(df_cbo, termo)
+    if df_opcoes.empty:
+        st.warning("Profissão não encontrada. Digite outro nome ou código.")
     else:
-        st.subheader("📈 Previsão Salarial")
+        primeira_opcao = df_opcoes.iloc[0]
+        cbo_selecionado = st.selectbox("Selecione o CBO:", df_opcoes["descricao"], index=0)
+        codigo_cbo = df_opcoes[df_opcoes["descricao"]==cbo_selecionado]["codigo"].values[0]
 
-        X = df_mensal[["mes"]]
-        y = df_mensal["salario"]
+        st.subheader(f"Profissão: {cbo_selecionado}")
+        df_prof = df_hist[df_hist["cbo2002ocupacao"] == str(codigo_cbo)]
 
-        modelo = LinearRegression().fit(X, y)
+        if not df_prof.empty:
+            salario_medio = df_prof["salario"].mean()
+            st.write(f"Salário médio atual: R$ {salario_medio:,.2f}")
 
-        ultimo_mes = df_mensal["mes"].max()
+            # Treinar modelo XGBoost para salário
+            modelo_salario = treinar_modelo_salario(df_prof)
+            if modelo_salario:
+                st.write("Previsão salarial futura do melhor modelo:")
+                idade_atual = int(df_prof["idade"].median())
+                horas = int(df_prof["horascontratuais"].median())
+                for anos in [5, 10, 15, 20]:
+                    previsao = prever_salario(modelo_salario, anos, idade_atual, horas)
+                    st.write(f"  {anos} anos → R$ {previsao:,.2f}")
+            else:
+                st.info("Sem dados suficientes para previsão salarial.")
 
-        anos = [5, 10, 15, 20]
+            # Treinar modelo XGBoost para tendência de vagas
+            modelo_vagas = treinar_modelo_vagas(df_prof)
+            if modelo_vagas:
+                st.write("\nTendência de vagas futuras (XGBoost):")
+                for anos in [5, 10, 15, 20]:
+                    vagas = prever_vagas(modelo_vagas, anos, idade_atual, horas)
+                    st.write(f"  {anos} anos: {vagas:.0f}")
+            else:
+                st.info("Sem dados suficientes para previsão de vagas.")
 
-        st.markdown("### **Previsão salarial futura:**")
-        for a in anos:
-            futuro = ultimo_mes + a * 12
-            pred = modelo.predict([[futuro]])[0]
-            st.write(f"**{a} anos → R$ {formatar_moeda(pred)}**")
-
-    # -------------------------------
-    # PREVISÃO DE VAGAS
-    # -------------------------------
-
-    st.subheader("📊 Tendência de Mercado")
-
-    if "saldomovimentacao" not in dfx.columns:
-        st.warning("Sem dados de vagas.")
-        return
-
-    saldo_medio = dfx["saldomovimentacao"].mean()
-
-    if saldo_medio > 10:
-        tendencia = "CRESCIMENTO ACELERADO"
-    elif saldo_medio > 0:
-        tendencia = "CRESCIMENTO LEVE"
-    elif saldo_medio < -10:
-        tendencia = "QUEDA ACELERADA"
-    elif saldo_medio < 0:
-        tendencia = "QUEDA LEVE"
-    else:
-        tendencia = "ESTÁVEL"
-
-    st.write(f"**Situação recente:** {tendencia}")
-
-    st.markdown("### **Projeção de vagas (admissões − desligamentos):**")
-
-    for a in [5, 10, 15, 20]:
-        st.write(f"{a} anos: {int(saldo_medio)} vagas/mês")
-
-
-# ---------------------------------------------------------
-#                      INTERFACE STREAMLIT
-# ---------------------------------------------------------
-
-st.set_page_config(page_title="Previsão Mercado de Trabalho", layout="wide")
-st.title("📊 Previsão do Mercado de Trabalho (CAGED / CBO)")
-
-busca = st.text_input("Digite nome ou código da profissão:")
-
-if busca:
-    resultados = buscar_profissao(busca)
-
-    if resultados.empty:
-        st.error("❌ Profissão não encontrada. Tente outro nome ou código.")
-    else:
-        lista = resultados["cbo_codigo"] + " - " + resultados["cbo_descricao"]
-
-        primeira_opcao = lista.iloc[0]
-
-        st.success("Profissão encontrada! Veja as opções relacionadas abaixo:")
-
-        escolha = st.selectbox(
-            "Selecione o CBO:",
-            lista,
-            index=0  # primeira opção já marcada
-        )
-
-        cbo = escolha.split(" - ")[0]
-
-        if st.button("Gerar Relatório Completo"):
-            relatorio(cbo)
+            # Ranking profissões mais promissoras
+            st.write("\n🔥 Ranking de profissões mais promissoras (maior salário médio):")
+            rank = rank_profissoes(df_hist)
+            st.table(rank.reset_index().rename(columns={"cbo2002ocupacao": "Código CBO", "salario": "Salário Médio"}))
+        else:
+            st.info("Sem dados históricos suficientes para esta profissão.")
