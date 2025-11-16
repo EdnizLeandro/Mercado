@@ -15,7 +15,7 @@ O módulo **Analytics & Mercado** utiliza **dados, indicadores e inteligência a
 
 ## 🎯 Objetivos
 
-- Analisar dados sobre o mercado de trabalho jovem em Recife;  
+- Analisar dados sobre o mercado de trabalho para os jovem da RMR;  
 - Gerar **insights e relatórios** para apoiar jovens a oportunidades de **emprego, educação e geração de renda**.;  
 - Promover **inclusão socioeconômica** por meio de informações acessíveis;  
 - Impulsionar o **desenvolvimento pessoal e profissional** de jovens.
