@@ -186,7 +186,7 @@ class MercadoTrabalhoPredictor:
 #                     APLICATIVO STREAMLIT
 # -------------------------------------------------------------------
 st.set_page_config(page_title="Previsão Mercado de Trabalho", layout="wide")
-st.title("📊 Análise e Previsão do Mercado de Trabalho (CAGED / CBO)")
+st.title("📊 Previsão do Mercado de Trabalho (CAGED / CBO)")
 
 PARQUET_FILE = "dados.parquet"
 CBO_FILE = "cbo.xlsx"
