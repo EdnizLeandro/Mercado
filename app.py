@@ -8,7 +8,7 @@ from xgboost import XGBRegressor
 from sklearn.metrics import mean_squared_error
 
 # ----------------------------------------------------------
-# FUNÇÃO PARA NORMALIZAR TEXTO
+# NORMALIZAÇÃO DE TEXTO
 # ----------------------------------------------------------
 def normalizar(texto):
     if not isinstance(texto, str):
@@ -20,34 +20,36 @@ def normalizar(texto):
     )
 
 # ----------------------------------------------------------
-# CARREGAR CBO
+# CARREGA CBO
 # ----------------------------------------------------------
 @st.cache_data
 def carregar_dados_cbo():
     df = pd.read_excel("cbo.xlsx")
     df.columns = ["Código", "Descrição"]
 
-    df["Código"] = df["Código"].astype(str).str.strip()
-    df["Descrição"] = df["Descrição"].astype(str).str.strip()
+    df["Código"] = df["Código"].astype(str).strip()
+    df["Descrição"] = df["Descrição"].astype(str).strip()
     df["Descrição_norm"] = df["Descrição"].apply(normalizar)
+
     return df
 
 # ----------------------------------------------------------
-# CARREGAR HISTÓRICO
+# CARREGA HISTÓRICO CAGED
 # ----------------------------------------------------------
 @st.cache_data
 def carregar_historico():
     df = pd.read_parquet("dados.parquet")
 
-    cols_norm = {}
-    for col in df.columns:
-        col_norm = "".join(
-            c for c in unicodedata.normalize("NFD", col.lower())
-            if unicodedata.category(c) != "Mn"
+    # normalizar nomes das colunas
+    def norm(c):
+        return "".join(
+            x for x in unicodedata.normalize("NFD", c.lower())
+            if unicodedata.category(x) != "Mn"
         )
-        cols_norm[col] = col_norm
 
-    df.columns = cols_norm.values()
+    old_cols = list(df.columns)
+    new_cols = [norm(c) for c in old_cols]
+    df.columns = new_cols
 
     col_cbo = next((c for c in df.columns if "cbo" in c), None)
     col_sal = next((c for c in df.columns if "sal" in c), None)
@@ -67,46 +69,40 @@ def buscar_profissoes(df_cbo, texto):
     return df_cbo[df_cbo["Descrição_norm"].str.contains(tnorm, na=False)]
 
 # ----------------------------------------------------------
-# CRIAR COLUNA DE DATA — LIMITADO ENTRE 2020–2025
+# CRIA DATAS SEGURAS (2020–2025)
 # ----------------------------------------------------------
 def criar_datas_seguras(df):
-    df_sal = df.copy()
-    df_sal["y"] = df_sal.iloc[:, 0]
+    df = df.copy()
+    df["y"] = df.iloc[:, 0]
 
-    # 1) Se existir ano/mes no parquet
-    col_ano = next((c for c in df_sal.columns if "ano" in c), None)
-    col_mes = next((c for c in df_sal.columns if "mes" in c), None)
+    # Caso tenha ano/mes
+    col_ano = next((c for c in df.columns if "ano" in c), None)
+    col_mes = next((c for c in df.columns if "mes" in c), None)
 
     if col_ano and col_mes:
-        df_sal["data"] = pd.to_datetime(
-            df_sal[col_ano].astype(str) + "-" + df_sal[col_mes].astype(str) + "-01"
-        )
-        df_sal = df_sal[df_sal["data"].between("2020-01-01", "2025-12-31")]
-        return df_sal[["data", "y"]]
+        df["data"] = pd.to_datetime(df[col_ano].astype(str) + "-" +
+                                    df[col_mes].astype(str) + "-01", errors="coerce")
+        df = df[df["data"].between("2020-01-01", "2025-12-01")]
+        return df[["data", "y"]]
 
-    # 2) Se existir 'competenciamov' tipo 202001
-    if "competenciamov" in df_sal.columns:
-        df_sal["data"] = pd.to_datetime(df_sal["competenciamov"].astype(str), format="%Y%m")
-        df_sal = df_sal[df_sal["data"].between("2020-01-01", "2025-12-31")]
-        return df_sal[["data", "y"]]
+    # Caso tenha competenciamov (202001)
+    if "competenciamov" in df.columns:
+        df["data"] = pd.to_datetime(df["competenciamov"].astype(str),
+                                    format="%Y%m", errors="coerce")
+        df = df[df["data"].between("2020-01-01", "2025-12-01")]
+        return df[["data", "y"]]
 
-    # 3) Criar datas artificiais limitadas (2020–2025)
-    n = len(df_sal)
-    datas = pd.date_range(
-        start="2020-01-01",
-        end="2025-12-01",
-        freq="M"
-    )
-    datas = list(datas)[:n]
-
-    df_sal["data"] = datas
-    return df_sal[["data", "y"]]
+    # Caso não tenha data, gerar manual
+    datas = pd.date_range("2020-01-01", "2025-12-01", freq="M")
+    datas = datas[: len(df)]
+    df["data"] = datas
+    return df[["data", "y"]]
 
 # ----------------------------------------------------------
-# TREINAMENTO DO MELHOR MODELO
+# TREINA TODOS MODELOS E ESCOLHE O MELHOR
 # ----------------------------------------------------------
 def treinar_e_escolher_melhor_modelo(df):
-    df = df.sort_values("data").dropna()
+    df = df.dropna().sort_values("data")
 
     if len(df) < 24:
         return None
@@ -115,19 +111,19 @@ def treinar_e_escolher_melhor_modelo(df):
     train = df.iloc[:split]
     valid = df.iloc[split:]
 
-    results = {}
+    resultados = {}
 
     # PROPHET
     try:
-        prophet_df = train.rename(columns={"data": "ds", "y": "y"})
-        model_prophet = Prophet()
-        model_prophet.fit(prophet_df)
+        ptrain = train.rename(columns={"data": "ds", "y": "y"})
+        model_p = Prophet()
+        model_p.fit(ptrain)
 
-        future = valid.rename(columns={"data": "ds"})
-        pred = model_prophet.predict(future)["yhat"].values
+        pfuture = valid.rename(columns={"data": "ds"})
+        pred = model_p.predict(pfuture)["yhat"].values
 
-        rmse = np.sqrt(mean_squared_error(valid["y"].values, pred))
-        results["prophet"] = (rmse, model_prophet)
+        rmse = np.sqrt(mean_squared_error(valid["y"], pred))
+        resultados["prophet"] = (rmse, model_p)
     except Exception as e:
         print("Erro Prophet:", e)
 
@@ -137,41 +133,45 @@ def treinar_e_escolher_melhor_modelo(df):
         df_ml["mes"] = df_ml["data"].dt.month
         df_ml["ano"] = df_ml["data"].dt.year
 
-        train_ml = df_ml.iloc[:split]
-        valid_ml = df_ml.iloc[split:]
+        tml = df_ml.iloc[:split]
+        vml = df_ml.iloc[split:]
 
-        xgb = XGBRegressor(n_estimators=300, learning_rate=0.05)
-        xgb.fit(train_ml[["mes", "ano"]], train_ml["y"])
+        xgb = XGBRegressor(
+            n_estimators=350,
+            learning_rate=0.05,
+            max_depth=4
+        )
+        xgb.fit(tml[["mes", "ano"]], tml["y"])
 
-        pred = xgb.predict(valid_ml[["mes", "ano"]])
-        rmse = np.sqrt(mean_squared_error(valid_ml["y"], pred))
-        results["xgboost"] = (rmse, xgb)
+        pred = xgb.predict(vml[["mes", "ano"]])
+        rmse = np.sqrt(mean_squared_error(vml["y"], pred))
+        resultados["xgboost"] = (rmse, xgb)
     except Exception as e:
         print("Erro XGBoost:", e)
 
-    if not results:
+    if not resultados:
         return None
 
-    best_name = min(results, key=lambda m: results[m][0])
-    rmse, model = results[best_name]
+    melhor = min(resultados, key=lambda k: resultados[k][0])
+    rmse, modelo = resultados[melhor]
 
-    return {"modelo_nome": best_name, "melhor_modelo": model, "rmse": rmse}
+    return {"modelo_nome": melhor, "melhor_modelo": modelo, "rmse": rmse}
 
 # ----------------------------------------------------------
 # PREVISÃO
 # ----------------------------------------------------------
 def prever(modelo, modelo_nome, df):
-    max_date = pd.Timestamp("2025-12-01")
+    limite = pd.Timestamp("2025-12-01")
 
     if modelo_nome == "prophet":
-        future = modelo.make_future_dataframe(periods=36, freq="M")  # 3 anos
-        fc = modelo.predict(future)
-        fc = fc[["ds", "yhat"]].rename(columns={"ds": "data", "yhat": "y"})
-        fc = fc[fc["data"] <= max_date]
-        return fc
+        future = modelo.make_future_dataframe(periods=36, freq="M")
+        forecast = modelo.predict(future)
+        forecast = forecast[["ds", "yhat"]].rename(columns={"ds": "data", "yhat": "y"})
+        forecast = forecast[forecast["data"] <= limite]
+        return forecast
 
     if modelo_nome == "xgboost":
-        datas = pd.date_range(start=df["data"].max(), end=max_date, freq="M")
+        datas = pd.date_range(df["data"].max(), limite, freq="M")
         temp = pd.DataFrame({"data": datas})
         temp["mes"] = temp["data"].dt.month
         temp["ano"] = temp["data"].dt.year
@@ -194,33 +194,31 @@ if entrada:
     if res.empty:
         st.warning("Nenhuma profissão encontrada.")
         st.stop()
-    lista = (res["Descrição"] + " (" + res["Código"] + ")").tolist()
+    opcoes = (res["Descrição"] + " (" + res["Código"] + ")").tolist()
 else:
-    lista = []
+    opcoes = []
 
-escolha = st.selectbox("Selecione a profissão:", [""] + lista)
+escolha = st.selectbox("Selecione a profissão:", [""] + opcoes)
 
 if escolha:
-    cbo = escolha.split("(")[-1].replace(")", "").strip()
-    desc = escolha.split("(")[0].strip()
+    codigo = escolha.split("(")[-1].replace(")", "").strip()
+    descricao = escolha.split("(")[0].strip()
 
-    st.header(f"Profissão: {desc}")
+    st.header(f"Profissão: {descricao}")
 
-    dados = df_hist[df_hist[COL_CBO] == cbo]
+    dados = df_hist[df_hist[COL_CBO] == codigo]
 
     if dados.empty:
-        st.error("Sem dados.")
+        st.error("Sem dados para esta profissão.")
         st.stop()
 
-    # CRIAR SÉRIE COM DATAS SEGURAS
     df_sal = criar_datas_seguras(dados[[COL_SALARIO]])
 
     st.subheader("Treinando modelos...")
-
     modelo = treinar_e_escolher_melhor_modelo(df_sal)
 
     if modelo is None:
-        st.error("Dados insuficientes.")
+        st.error("Dados insuficientes para prever.")
         st.stop()
 
     st.success(f"Modelo escolhido: **{modelo['modelo_nome']}** (RMSE: {modelo['rmse']:.2f})")
@@ -231,8 +229,8 @@ if escolha:
     st.line_chart(previsao.set_index("data")["y"])
 
     st.info("""
-### Interpretação do gráfico:
-- A linha representa a tendência evolutiva do salário médio da profissão.
-- A projeção (parte futura) aparece estendida até dezembro de 2025.
-- O modelo escolhido automaticamente foi aquele com **menor erro RMSE**.
+### Como interpretar o gráfico:
+- A linha mostra a evolução estimada do salário médio da profissão escolhida.
+- A parte final representa as **previsões até dezembro de 2025**.
+- O algoritmo selecionado automaticamente é o de **melhor RMSE**, ou seja, menor erro.
 """)
