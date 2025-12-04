@@ -9,31 +9,36 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos personalizados 🎨
+# 🎨 ESTILOS PERSONALIZADOS
 custom_css = """
 <style>
     .main {
-        background-color: #f8f9fc;
+        background-color: #f7f9fc;
     }
 
     .stTextInput > div > div > input {
         border-radius: 10px;
-        border: 1px solid #B9B9B9;
-    }
-
-    .stMetric {
-        background: linear-gradient(135deg, #7b2ff7, #f107a3);
-        color: white !important;
-        padding: 18px;
-        border-radius: 18px;
-        text-align: center;
+        border: 1px solid #bbb;
     }
 
     h1 {
-        font-weight: 800;
+        font-weight: 900;
         background: -webkit-linear-gradient(#7b2ff7, #f107a3);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
+    }
+
+    /* Cards das métricas */
+    .metric-container {
+        background: linear-gradient(135deg, #7b2ff7cc, #f107a3cc);
+        color: white !important;
+        padding: 25px;
+        border-radius: 20px;
+        min-height: 130px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
     }
 
     .footer {
@@ -68,7 +73,7 @@ if df is not None:
     
     termo = st.text_input(
         "🔍 Pesquisar profissão:",
-        placeholder="Digite parte do nome... ex: Analista"
+        placeholder="Ex: Analista"
     )
 
     resultado_filtro = pd.DataFrame()
@@ -99,10 +104,24 @@ if df is not None:
 
         # ========== CARDS DE MÉTRICAS ==========
         col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.markdown(
+                f"<div class='metric-container'><h4>Salário Médio<br>R$ {info['salario_medio_atual']:.2f}</h4></div>",
+                unsafe_allow_html=True
+            )
+
+        with col2:
+            st.markdown(
+                f"<div class='metric-container'><h4>Modelo<br>{info['modelo_vencedor']}</h4></div>",
+                unsafe_allow_html=True
+            )
         
-        col1.metric("Salário Médio Atual", f"R$ {info['salario_medio_atual']:.2f}")
-        col2.metric("Modelo de Previsão", info['modelo_vencedor'])
-        col3.metric("Score do Modelo", f"{info['score']:.3f}")
+        with col3:
+            st.markdown(
+                f"<div class='metric-container'><h4>Score<br>{info['score']:.3f}</h4></div>",
+                unsafe_allow_html=True
+            )
 
         # ===== Tendência Salarial Inteligente =====
         sal_atual = float(info['salario_medio_atual'])
@@ -117,33 +136,41 @@ if df is not None:
 
         if variacao_total >= 8:
             tendencia_label = "Crescimento Acelerado"
-            tendencia_icon = "🔺"
+            tendencia_icon = "🚀"
         elif 0 < variacao_total < 8:
             tendencia_label = "Crescimento"
-            tendencia_icon = "⬆️"
+            tendencia_icon = "📈"
         elif -3 <= variacao_total <= 3:
             tendencia_label = "Estabilidade"
             tendencia_icon = "➖"
         elif -8 < variacao_total < -3:
             tendencia_label = "Leve Queda"
-            tendencia_icon = "⬇️"
+            tendencia_icon = "📉"
         else:
             tendencia_label = "Queda Acentuada"
-            tendencia_icon = "🔻"
+            tendencia_icon = "⚠️"
 
-        col4.metric(
-            label="Tendência Salarial",
-            value=f"{tendencia_icon} {tendencia_label}",
-            help=f"Variação prevista em 20 anos: {variacao_total:.1f}%"
-        )
+        tendencia_html = f"""
+        <div class='metric-container'>
+            <div style='text-align:center;'>
+                <span style='font-size:32px'>{tendencia_icon}</span><br>
+                <span style='font-size:14px;font-weight:600;'>{tendencia_label}</span><br>
+                <span style='font-size:11px;opacity:0.8;'>({variacao_total:.1f}% em 20 anos)</span>
+            </div>
+        </div>
+        """
 
-        # ========== GRÁFICO ==========
+        with col4:
+            st.markdown(tendencia_html, unsafe_allow_html=True)
+
+        # ========== GRÁFICO DE PROJEÇÃO ==========
         anos = ["+5 anos", "+10 anos", "+15 anos", "+20 anos"]
 
         fig = go.Figure(go.Scatter(
             x=anos, y=projecoes,
             mode="lines+markers",
             marker={"size": 12},
+            line={"width": 3}
         ))
         
         fig.update_layout(
