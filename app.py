@@ -1,159 +1,183 @@
-import streamlit as st
+import streamlit as st 
 import pandas as pd
 import plotly.graph_objs as go
+import math
 
-# Configuração
+# ===================== CONFIGURAÇÃO DA PÁGINA =====================
 st.set_page_config(
-    page_title="Jobin Inteligente | Mercado de Trabalho",
-    layout="centered",
+    page_title="Jobin - Salários & Tendências",
+    layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Paleta e estilo do app
-st.markdown("""
+# ===================== CSS & VISUAL =====================
+st.markdown(
+    """
     <style>
-    .main-title {
-        font-size: 26px !important;
-        font-weight: 700;
-        color: white !important;
-        background: linear-gradient(90deg, #6A11CB, #2575FC);
-        padding: 12px 18px;
+    .reportview-container .main {
+        background: #f5f7fb;
+        padding-top: 12px;
+        padding-bottom: 30px;
+    }
+    .title-banner {
+        background: linear-gradient(90deg,#7b2ff7 0%, #f107a3 100%);
+        padding: 18px 22px;
         border-radius: 12px;
-        text-align: center;
-        margin-bottom: 25px;
-    }
-    .metric-row {
+        color: white;
         display: flex;
+        align-items: center;
         justify-content: space-between;
-        gap: 14px;
+        box-shadow: 0 6px 18px rgba(23,0,102,0.12);
+        margin-bottom: 18px;
     }
-    .tendencia-box {
-        background-color: #f5f7ff;
-        border-left: 6px solid #4a6cff;
-        padding: 12px;
-        border-radius: 10px;
-        font-size: 15px;
-        margin-top: 10px;
+    .title-banner h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 900;
+        color: white;
+    }
+    .subtitle {
+        margin: 0;
+        color: #f1e7ff;
+        opacity: 0.95;
+        font-size: 13px;
+    }
+    .card {
+        background: rgba(255,255,255,0.7);
+        border-radius: 12px;
+        padding: 14px;
+        text-align: center;
+        box-shadow: 0 6px 18px rgba(15,15,20,0.04);
+        min-height: 110px;
+    }
+    .card .icon {
+        font-size: 26px;
+        margin-bottom: 6px;
+    }
+    .card .value {
+        font-size: 18px;
+        font-weight: 800;
+        color: #111827;
+    }
+    .card .label {
+        display:block;
+        font-size: 12px;
+        color: #6b7280;
+        margin-top: 6px;
+        font-weight:600;
+    }
+    .muted {
+        font-size: 12px;
+        color: #6b7280;
     }
     .footer {
         text-align:center;
-        color: grey;
-        margin-top: 35px;
-        font-size: 13px;
+        color:#9aa0b4;
+        font-size:13px;
+        margin-top:30px;
     }
     </style>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True
+)
 
-st.markdown("<div class='main-title'>🔎 Jobin Inteligente - Salários & Tendências do Mercado</div>", unsafe_allow_html=True)
+# ===================== BANNER =====================
+st.markdown(
+    """
+    <div class="title-banner">
+        <div>
+            <h1>🔎 Jobin Inteligente - Salários & Tendências do Mercado de Trabalho</h1>
+            <div class="subtitle">Pesquise profissões, veja projeções salariais e demanda do mercado.</div>
+        </div>
+        <div style="text-align:right;font-size:13px;color:#fff;opacity:0.9;">
+            © 2025 Jobin Analytics
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
-# Carregamento do CSV
+# ===================== DADOS =====================
 @st.cache_data
-def carregar_dados():
+def carregar_dados(path="cache_Jobin1.csv"):
     try:
-        return pd.read_csv("cache_Jobin1.csv")
+        df = pd.read_csv(path, encoding="utf-8")
+        return df
+    except FileNotFoundError:
+        st.error(f"❌ Arquivo '{path}' não foi encontrado no diretório da aplicação.")
+        st.stop()
     except Exception as e:
-        st.error(f"Erro ao carregar CSV: {e}")
-        return None
+        st.error(f"⚠ Erro ao carregar CSV: {e}")
+        st.stop()
 
 df = carregar_dados()
 
-# Se dados carregaram:
-if df is not None:
+st.markdown("**Busque por profissão (nome parcial ou completo):**")
+termo = st.text_input("", placeholder="Ex.: Analista, Enfermeiro…")
 
-    termo = st.text_input(
-        "Digite parte do nome da profissão:",
-        placeholder="Ex: programador, designer, mecânico..."
-    )
-
-    resultado_filtro = pd.DataFrame()
-    cbo_selecionado = None
-
-    if termo:
-        resultado_filtro = df[df['descricao'].str.contains(termo, case=False, na=False)]
-
-        if resultado_filtro.empty:
-            st.warning("Nenhuma profissão encontrada. Tente outro termo!")
-        else:
-            st.success(f"{resultado_filtro.shape[0]} profissões encontradas! Selecione uma abaixo 👇")
-
-            opcoes = [
-                f"{row['codigo']} - {row['descricao']}"
-                for _, row in resultado_filtro.iterrows()
-            ]
-
-            cbo_str = st.selectbox("Escolha o CBO desejado:", options=opcoes)
-            cbo_selecionado = int(cbo_str.split(" - ")[0])
-
+if termo:
+    resultados = df[df["descricao"].str.contains(termo, case=False, na=False)]
+    
+    if resultados.empty:
+        st.warning("Nenhuma profissão encontrada.")
     else:
-        st.info("🔍 Comece digitando o nome da profissão...")
+        st.success(f"{len(resultados)} encontrados")
+        escolha = st.selectbox(
+            "Selecione a profissão:",
+            resultados.apply(lambda x: f"{int(x['codigo'])} - {x['descricao']}", axis=1)
+        )
 
-    # Se uma profissão for selecionada:
-    if cbo_selecionado:
-        info = resultado_filtro[resultado_filtro['codigo'] == cbo_selecionado].iloc[0]
+        cbo = int(escolha.split(" - ")[0])
+        info = resultados[resultados["codigo"] == cbo].iloc[0]
 
-        st.subheader(f"✨ Profissão Selecionada: **{info['descricao']}** (CBO {info['codigo']})")
+        st.markdown(f"### {info['descricao']}  •  CBO {cbo}")
+        st.markdown("<span class='muted'>Base Jobin + Novo CAGED</span>", unsafe_allow_html=True)
+        st.write("")
 
-        # Métricas principais
-        col1, col2, col3 = st.columns(3)
+        # ===== CARDS =====
+        col1, col2, col3, col4 = st.columns(4, gap="large")
+        salario = float(info.get("salario_medio_atual", 0.0))
+        modelo  = str(info.get("modelo_vencedor", "—"))
+        score   = float(info.get("score", 0.0))
+        mercado = str(info.get("tendencia_mercado", ""))
 
-        col1.metric("💰 Salário Médio", f"R$ {float(info['salario_medio_atual']):.2f}")
-        col2.metric("🤖 Modelo de Previsão", f"{info['modelo_vencedor']}")
-        col3.metric("📈 Score do Modelo", f"{float(info['score']):.3f}")
+        card_tpl = lambda icon, val, label: f"""
+            <div class="card">
+                <div class="icon">{icon}</div>
+                <div class="value">{val}</div>
+                <span class="label">{label}</span>
+            </div>
+        """
 
-        # Gráfico da projeção salarial
-        anos = ["5 anos", "10 anos", "15 anos", "20 anos"]
-        values = [
-            float(info['previsao_5']),
-            float(info['previsao_10']),
-            float(info['previsao_15']),
-            float(info['previsao_20'])
+        col1.markdown(card_tpl("💰", f"R$ {salario:,.2f}", "Salário Médio"), unsafe_allow_html=True)
+        col2.markdown(card_tpl("🧠", modelo, "Modelo"), unsafe_allow_html=True)
+        col3.markdown(card_tpl("📊", f"{score:.3f}", "Score"), unsafe_allow_html=True)
+        col4.markdown(card_tpl("📈", mercado if mercado else "N/A", "Mercado"), unsafe_allow_html=True)
+
+        st.write("")
+
+        # ===== PROJEÇÕES =====
+        st.markdown("#### 📊 Projeção Salarial: +5, +10, +15, +20 anos")
+
+        anos = ["+5 anos", "+10 anos", "+15 anos", "+20 anos"]
+        vals = [
+            float(info.get("previsao_5", 0.0)),
+            float(info.get("previsao_10", 0.0)),
+            float(info.get("previsao_15", 0.0)),
+            float(info.get("previsao_20", 0.0))
         ]
 
-        # Cálculo de tendência salarial
-        salario_atual = float(info["salario_medio_atual"])
-        salario_20 = values[-1]
-        crescimento = ((salario_20 - salario_atual) / salario_atual) * 100
-
-        if crescimento > 18:
-            status = "🚀 Crescimento Acelerado"
-            cor_grafico = "#09BC8A"
-        elif crescimento > 8:
-            status = "📈 Crescimento Moderado"
-            cor_grafico = "#4A6CFF"
-        else:
-            status = "⚠ Crescimento Baixo"
-            cor_grafico = "#C94A4A"
-
-        fig = go.Figure(
-            go.Scatter(
-                x=anos,
-                y=values,
-                mode='lines+markers',
-                line=dict(width=3, color=cor_grafico),
-                marker=dict(size=10)
-            )
-        )
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=anos, y=vals, mode="lines+markers",
+            marker=dict(size=10), line=dict(width=3, color="#7b2ff7")
+        ))
         fig.update_layout(
-            title="📉 Projeção Salarial",
-            xaxis_title="Prazo da projeção",
-            yaxis_title="Salário (R$)",
-            template="simple_white"
+            template="plotly_white",
+            height=420,
+            margin=dict(t=25, r=20, l=40, b=10),
+            xaxis_title="Horizonte",
+            yaxis_title="Salário (R$)"
         )
         st.plotly_chart(fig, use_container_width=True)
 
-        # Tendência coerente com o gráfico
-        st.markdown(f"""
-        <div class="tendencia-box">
-        <b>{status}</b>  
-        → Projeção: <b>{crescimento:.1f}%</b> nos próximos 20 anos
-        </div>
-        """, unsafe_allow_html=True)
-
-else:
-    st.error("❌ O arquivo 'cache_Jobin1.csv' não foi encontrado ou falhou no carregamento.")
-
-# Rodapé
-st.markdown(
-    "<div class='footer'>© 2025 Jobin Analytics  —  Dados do Novo CAGED</div>",
-    unsafe_allow_html=True
-)
+st.markdown("<div class='footer'>Jobin Analytics © 2025</div>", unsafe_allow_html=True)
