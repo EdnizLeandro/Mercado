@@ -12,46 +12,47 @@ st.set_page_config(
 )
 
 # =============================
-# CSS GLOBAL COM TEXTOS PRETOS
-# E BRANCOS APENAS NOS LOCAIS SOLICITADOS
+# CSS GLOBAL (TUDO PRETO)
+# + TEXTOS ESPECÍFICOS EM BRANCO
 # =============================
 st.markdown("""
 <style>
-/* Tudo preto por padrão */
+
 * {
     color: black !important;
 }
 
-/* TÍTULO PRINCIPAL E INTRODUÇÃO — BRANCO */
+/* ----------------------- */
+/* 1. TÍTULO PRINCIPAL E INTRODUÇÃO */
 #titulo_principal h1,
 #titulo_principal p {
     color: white !important;
 }
 
-/* Label do input (Digite parte do nome...) — BRANCO */
+/* ----------------------- */
+/* 2. LABEL DO INPUT */
 label[for="Digite parte do nome da profissão:"] {
     color: white !important;
 }
 
-/* Texto "Foram encontrados..." — BRANCO */
+/* ----------------------- */
+/* 3. TEXTO DOS RESULTADOS */
 .resultados-encontrados {
     color: white !important;
 }
 
-/* Label "Selecione o CBO" — BRANCO */
+/* ----------------------- */
+/* 4. LABEL DO SELECTBOX */
 .cbo-label {
     color: white !important;
 }
 
-/* Profissão selecionada — BRANCO */
-.profissao-titulo {
+/* ----------------------- */
+/* 5. ITENS DO SELECTBOX (CBO) */
+div[data-baseweb="select"] * {
     color: white !important;
 }
 
-/* Título do gráfico — BRANCO */
-.projecao-titulo {
-    color: white !important;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -87,7 +88,7 @@ df = carregar_dados()
 
 
 # =============================
-# COMPONENTE: TERMÔMETRO DO MERCADO
+# TERMÔMETRO DO MERCADO
 # =============================
 def mostrar_termometro(estado):
     estados = {
@@ -103,10 +104,10 @@ def mostrar_termometro(estado):
         if k in estado.lower():
             estado_key = k
             break
-    
+
     titulo, cor, texto = estados.get(
         estado_key,
-        ("⚪ Tendência Indefinida", "#9ca3af", "Ainda não há dados claros suficientes.")
+        ("⚪ Tendência Indefinida", "#9ca3af", "Ainda não há dados suficientes.")
     )
 
     st.markdown(f"""
@@ -124,33 +125,34 @@ def mostrar_termometro(estado):
     """, unsafe_allow_html=True)
 
 
+
 # =============================
-# COMPONENTE: DICAS PARA JOVENS
+# DICAS PARA JOVENS
 # =============================
 def dicas_para_jovens(profissao, tendencia):
-    profissão = profissao.lower()
+    p = profissao.lower()
 
-    if "pintor" in profissão:
-        return "Monte um portfólio com fotos reais. Pequenos serviços no bairro aumentam sua reputação."
-    if "analista" in profissão or "tecnologia" in profissão:
-        return "Crie pequenos projetos e coloque no GitHub — isso te destaca muito."
-    if "enfermeiro" in profissão or "cuidador" in profissão:
-        return "Cursos de certificação aumentam suas chances de contratação."
-    if "assistente" in profissão or "auxiliar" in profissão:
-        return "Cursos curtos aumentam seu salário de entrada."
-    if "motorista" in profissão:
-        return "Documentação e comunicação aumentam sua renda."
+    if "vendedor" in p:
+        return "Aprenda técnicas de persuasão e atendimento — isso dobra suas chances."
+    if "pintor" in p:
+        return "Monte um portfólio com fotos reais — isso aumenta muito sua credibilidade."
+    if "analista" in p or "tecnologia" in p:
+        return "Criar projetos práticos te destaca de 90% dos candidatos."
+    if "enfermeiro" in p or "cuidador" in p:
+        return "Obtenha certificações — elas elevam seu salário rapidamente."
+    if "motorista" in p:
+        return "Mantenha bons feedbacks — reputação vale ouro."
 
     if "alta" in tendencia.lower():
-        return "Aproveite o momento: candidaturas rápidas aumentam as chances."
-    elif "baixa" in tendencia.lower():
-        return "Use o período para se qualificar — isso te destaca."
-    else:
-        return "O mercado pode mudar rápido — fique atento."
+        return "Aproveite: vagas estão surgindo com mais frequência."
+    if "baixa" in tendencia.lower():
+        return "Boa hora para fazer cursos e se preparar."
+
+    return "Continue acompanhando — o mercado pode virar rápido."
 
 
 # =============================
-# MÉTRICAS ESTILIZADAS (PRETAS)
+# MÉTRICAS ESTILIZADAS
 # =============================
 def metric_card(titulo, valor, cor="#7c3aed", icone="📌"):
     st.markdown(f"""
@@ -160,10 +162,9 @@ def metric_card(titulo, valor, cor="#7c3aed", icone="📌"):
         border-radius:12px;
         border-left:6px solid {cor};
         margin-bottom:1em;
-        color:black !important;
     ">
-        <h4 style="margin:0;">{icone} {titulo}</h4>
-        <p style="font-size:1.3em;margin-top:.3em;"><b>{valor}</b></p>
+        <h4 style="margin:0; color:black !important;">{icone} {titulo}</h4>
+        <p style="font-size:1.3em;margin-top:.3em; color:black !important;"><b>{valor}</b></p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -175,15 +176,15 @@ if df is not None:
 
     termo = st.text_input(
         "Digite parte do nome da profissão:",
-        placeholder="Exemplo: pintor"
+        placeholder="Exemplo: vendedor"
     )
 
     resultado_filtro = pd.DataFrame()
     cbo_selecionado = None
 
     if termo:
-        resultado_filtro = df[df['descricao'].str.contains(termo, case=False, na=False)]
-        
+        resultado_filtro = df[df["descricao"].str.contains(termo, case=False, na=False)]
+
         if resultado_filtro.empty:
             st.warning("Nenhuma profissão encontrada.")
         else:
@@ -193,12 +194,11 @@ if df is not None:
             )
 
             nomes_cbos = [
-                f"{row['codigo']} - {row['descricao']}" 
+                f"{row['codigo']} - {row['descricao']}"
                 for _, row in resultado_filtro.iterrows()
             ]
 
             st.markdown("<p class='cbo-label'>Selecione o CBO:</p>", unsafe_allow_html=True)
-
             cbo_str = st.selectbox("", options=nomes_cbos)
 
             if cbo_str:
@@ -209,52 +209,55 @@ if df is not None:
     # EXIBIÇÃO DOS RESULTADOS
     # =============================
     if cbo_selecionado:
-        info = resultado_filtro[resultado_filtro['codigo'] == cbo_selecionado].iloc[0]
+        info = resultado_filtro[resultado_filtro["codigo"] == cbo_selecionado].iloc[0]
 
         st.markdown(
-            f"<h3 class='profissao-titulo'>👤 Profissão: {info['descricao']} (CBO {info['codigo']})</h3>",
+            f"<h3 class='profissao-titulo' style='color:white !important;'>👤 Profissão: {info['descricao']} (CBO {info['codigo']})</h3>",
             unsafe_allow_html=True
         )
 
         col1, col2 = st.columns(2)
         with col1:
             metric_card("Salário Médio Atual", f"R$ {float(info['salario_medio_atual']):.2f}", "#7c3aed", "💰")
-            metric_card("Modelo da Previsão", info['modelo_vencedor'], "#9333ea", "🧠")
+            metric_card("Modelo da Previsão", info["modelo_vencedor"], "#9333ea", "🧠")
 
         with col2:
             metric_card("Confiabilidade do Modelo", f"{float(info['score']):.4f}", "#7c3aed", "📊")
-            metric_card("Tendência Salarial", info['tendencia_salarial'], "#a855f7", "📈")
+            metric_card("Tendência Salarial", info["tendencia_salarial"], "#a855f7", "📈")
 
+        mostrar_termometro(info["tendencia_mercado"])
 
-        mostrar_termometro(info['tendencia_mercado'])
-
-        st.markdown("<h3 class='projecao-titulo'>📈 Projeção Salarial (5/10/15/20 anos)</h3>", unsafe_allow_html=True)
+        st.markdown(
+            "<h3 class='projecao-titulo' style='color:white !important;'>📈 Projeção Salarial (5/10/15/20 anos)</h3>",
+            unsafe_allow_html=True
+        )
 
         anos_futuro = ["+5 anos", "+10 anos", "+15 anos", "+20 anos"]
         salarios_futuro = [
-            float(info['previsao_5']),
-            float(info['previsao_10']),
-            float(info['previsao_15']),
-            float(info['previsao_20'])
+            float(info["previsao_5"]),
+            float(info["previsao_10"]),
+            float(info["previsao_15"]),
+            float(info["previsao_20"])
         ]
 
         fig = go.Figure(
             go.Scatter(
                 x=anos_futuro,
                 y=salarios_futuro,
-                mode='lines+markers',
-                line=dict(color='black'),
-                marker=dict(size=10, color='black')
+                mode="lines+markers",
+                line=dict(color="black"),
+                marker=dict(size=10, color="black")
             )
         )
+
         fig.update_layout(
             title=f"Salário Previsto para {info['descricao']}",
             xaxis_title="Horizonte",
             yaxis_title="Salário (R$)",
             template="simple_white"
         )
-        st.plotly_chart(fig, use_container_width=True)
 
+        st.plotly_chart(fig, use_container_width=True)
 
         st.markdown("### 💡 Dicas para você")
         st.markdown(f"""
@@ -263,7 +266,6 @@ if df is not None:
             border-left:6px solid #7c3aed;
             padding:1em;
             border-radius:10px;
-            color:black !important;
         ">
             <strong>Recomendação:</strong><br>
             {dicas_para_jovens(info['descricao'], info['tendencia_mercado'])}
@@ -271,17 +273,11 @@ if df is not None:
         """, unsafe_allow_html=True)
 
 
-else:
-    st.error("Erro ao carregar 'cache_Jobin1.csv'.")
-
-
 # =============================
 # FOOTER
 # =============================
 st.markdown(
     "<hr style='margin-top:2em;margin-bottom:1em;'>"
-    "<div style='text-align:center;'>"
-    "© 2025 Jobin Analytics | Powered by Streamlit"
-    "</div>",
+    "<div style='text-align:center;'>© 2025 Jobin Analytics | Powered by Streamlit</div>",
     unsafe_allow_html=True
 )
