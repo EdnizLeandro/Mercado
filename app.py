@@ -2,9 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objs as go
 
-# ---------------------------------------------------------------------
 # Estilo moderno Jobin
-# ---------------------------------------------------------------------
+
 def css():
     st.markdown("""
     <style>
