@@ -5,7 +5,7 @@ import math
 
 # ===================== CONFIGURAÇÃO DA PÁGINA =====================
 st.set_page_config(
-    page_title="Jobin — Salários & Tendências",
+    page_title="Jobin - Salários & Tendências",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -155,7 +155,7 @@ if termo:
         st.write("")
 
         # ===== PROJEÇÕES =====
-        st.markdown("#### 📊 Projeção Salarial — +5, +10, +15, +20 anos")
+        st.markdown("#### 📊 Projeção Salarial: +5, +10, +15, +20 anos")
 
         anos = ["+5 anos", "+10 anos", "+15 anos", "+20 anos"]
         vals = [
