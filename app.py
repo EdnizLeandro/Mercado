@@ -85,7 +85,7 @@ st.markdown(
     """
     <div class="title-banner">
         <div>
-            <h1>🔎 Jobin Inteligente — Salários & Tendências do Mercado</h1>
+            <h1>🔎 Jobin Inteligente - Salários & Tendências do Mercado de Trabalho</h1>
             <div class="subtitle">Pesquise profissões, veja projeções salariais e demanda do mercado.</div>
         </div>
         <div style="text-align:right;font-size:13px;color:#fff;opacity:0.9;">
