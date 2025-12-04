@@ -3,185 +3,122 @@ import pandas as pd
 import plotly.graph_objs as go
 
 # ---------------------------------------------------------------------
-# Estilo personalizado do Dashboard - Mais moderno e juvenil
+# Estilo moderno Jobin
 # ---------------------------------------------------------------------
-def aplicar_css_customizado():
+def css():
     st.markdown("""
-        <style>
-        body {
-            background-color: #ffffff;
-        }
+    <style>
         .main > div {
-            background: linear-gradient(135deg, #ff007f 10%, #b300b3 90%);
-            padding: 20px;
-            border-radius: 12px;
+            background: linear-gradient(135deg, #EC008C 0%, #673AB7 100%);
+            padding: 25px;
+            border-radius: 14px;
         }
         h1 {
             color: white !important;
+            font-size: 34px;
             font-weight: 900;
         }
-        .stMetric {
-            background: #ffffff10;
-            border-radius: 14px;
-            padding: 12px;
+        .indicador-box {
+            background: rgba(255,255,255,0.25);
+            padding: 18px;
+            border-radius: 12px;
             text-align: center;
+            font-weight: 600;
+            color: white;
+            font-size: 1.05rem;
         }
-        .tendencia-box {
-            background: rgba(255,255,255,0.15);
-            padding: 12px 20px;
-            color: #fff;
-            font-weight: bold;
+        .tendencia {
+            padding: 14px;
             border-radius: 10px;
+            font-weight: bold;
+            font-size: 1.2rem;
             text-align: center;
-            font-size: 1.1rem;
-            margin-top: 10px;
+            margin-top: 15px;
         }
         .footer {
-            text-align:center;
-            color:#f5f5f5;
+            text-align: center;
+            color: #eee;
+            margin-top: 30px;
         }
-        </style>
+    </style>
     """, unsafe_allow_html=True)
 
-aplicar_css_customizado()
+css()
 
-st.set_page_config(
-    page_title="Dashboard Profissões - Salários & Tendências",
-    layout="centered",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Jobin - Salários & Mercado", layout="centered")
 
 st.title("🔎 Jobin Inteligente - Salários & Tendências do Mercado")
+st.write("Pesquise uma profissão e visualize o futuro dela no Brasil.")
 
-st.markdown("""
-Pesquise por profissão _digitando o nome completo ou parcial_ (ex: **pintor**, **analista**, **enfermeiro**) e escolha o CBO desejado para visualizar projeções salariais e tendências de mercado.
-""")
-
-# ---------------------------------------------------------------------
-# Carregamento dos dados
-# ---------------------------------------------------------------------
 @st.cache_data
-def carregar_dados():
-    try:
-        df = pd.read_csv("cache_Jobin1.csv")
-        return df
-    except Exception as e:
-        st.error(f"Erro ao carregar os dados: {e}")
-        return None
+def load():
+    return pd.read_csv("cache_Jobin1.csv")
 
-df = carregar_dados()
+df = load()
 
+termo = st.text_input("Digite parte do nome da profissão:", placeholder="Ex: Analista")
 
-# ---------------------------------------------------------------------
-# Interface de busca
-# ---------------------------------------------------------------------
-if df is not None:
-    termo = st.text_input(
-        "Digite parte do nome da profissão:",
-        placeholder="Exemplo: pintor"
-    )
+if termo:
+    resultados = df[df["descricao"].str.contains(termo, case=False, na=False)]
 
-    cbo_selecionado = None
-    resultado_filtro = pd.DataFrame()
-    
-    if termo:
-        resultado_filtro = df[df['descricao'].str.contains(termo, case=False, na=False)]
-
-        if resultado_filtro.empty:
-            st.warning("Nenhuma profissão encontrada. Tente outro termo.")
-        else:
-            st.write(f"**{resultado_filtro.shape[0]} resultados encontrados para:** '{termo}'")
-
-            nomes_cbos = [
-                f"{row['codigo']} - {row['descricao']}"
-                for _, row in resultado_filtro.iterrows()
-            ]
-
-            cbo_str = st.selectbox(
-                "Selecione o CBO e profissão desejada:",
-                options=nomes_cbos
-            )
-
-            if cbo_str:
-                cbo_selecionado = int(cbo_str.split(' - ')[0])
+    if resultados.empty:
+        st.warning("Nenhuma profissão encontrada.")
     else:
-        st.info("Digite parte do nome da profissão para começar.")
+        opcao = st.selectbox("Selecione o CBO:", resultados.apply(lambda x: f"{x['codigo']} - {x['descricao']}", axis=1))
 
-    if cbo_selecionado:
-        info = resultado_filtro[resultado_filtro['codigo'] == cbo_selecionado].iloc[0]
-        st.subheader(f"Profissão: {info['descricao']} (CBO {info['codigo']})")
+        codigo = int(opcao.split(" - ")[0])
+        info = resultados[resultados["codigo"] == codigo].iloc[0]
 
-        # =====================================================================
-        # Indicadores com Ícones 😎
-        # =====================================================================
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("💰 Salário Médio", f"R$ {float(info['salario_medio_atual']):.2f}")
-            st.metric("🧠 Modelo", f"{info['modelo_vencedor']}")
-        with col2:
-            st.metric("📈 Score", f"{float(info['score']):.4f}")
-            # A Tendência será atualizada com base no gráfico
+        st.subheader(f"{info['descricao']} • CBO {codigo}")
 
-        # =====================================================================
-        # Projeção Salarial
-        # =====================================================================
-        st.markdown("#### 📊 Projeção Salarial (5, 10, 15 e 20 anos)")
+        # Indicadores
+        col1, col2, col3, col4 = st.columns(4)
+        col1.markdown(f"<div class='indicador-box'>💰<br>R$ {info['salario_medio_atual']:.2f}<br><small>Salário Médio</small></div>", unsafe_allow_html=True)
+        col2.markdown(f"<div class='indicador-box'>🧠<br>{info['modelo_vencedor']}<br><small>Modelo</small></div>", unsafe_allow_html=True)
+        col3.markdown(f"<div class='indicador-box'>📊<br>{info['score']:.3f}<br><small>Score</small></div>", unsafe_allow_html=True)
 
-        anos = ["+5 anos", "+10 anos", "+15 anos", "+20 anos"]
-        valores = [
-            float(info['previsao_5']),
-            float(info['previsao_10']),
-            float(info['previsao_15']),
-            float(info['previsao_20'])
-        ]
-
-        crescimento_pct = ((valores[-1] - valores[0]) / valores[0]) * 100
-
-        if crescimento_pct > 15:
-            tendencia_msg = f"🚀 Crescimento Acelerado ({crescimento_pct:.1f}% em 20 anos)"
-            tendencia_cor = "#00e676"
-        elif crescimento_pct > 2:
-            tendencia_msg = f"📈 Crescimento Moderado ({crescimento_pct:.1f}% em 20 anos)"
-            tendencia_cor = "#ffeb3b"
-        elif crescimento_pct > -2:
-            tendencia_msg = f"⚖️ Estabilidade ({crescimento_pct:.1f}% em 20 anos)"
-            tendencia_cor = "#ffffff"
+        # Tendência do mercado (nova lógica)
+        tendencia_raw = str(info.get("tendencia_mercado", "")).lower()
+        if "alta" in tendencia_raw:
+            icon, cor = "🔥", "#00e676"
+        elif "baixa" in tendencia_raw:
+            icon, cor = "⚠️", "#ff5252"
+        elif "estável" in tendencia_raw:
+            icon, cor = "ℹ️", "#2196F3"
         else:
-            tendencia_msg = f"📉 Queda Salarial ({crescimento_pct:.1f}% em 20 anos)"
-            tendencia_cor = "#ff5252"
+            icon, cor = "📌", "#ffffff"
 
-        fig = go.Figure(
-            go.Scatter(
-                x=anos,
-                y=valores,
-                mode='lines+markers',
-                marker=dict(size=11),
-                line=dict(width=4)
-            )
-        )
-        fig.update_layout(
-            title=f"Evolução Salarial de {info['descricao']}",
-            xaxis_title="Tempo",
-            yaxis_title="Salário (R$)",
-            template="plotly_white"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-        # Tendência com destaque visual
-        st.markdown(
-            f"""
-            <div class="tendencia-box" style="background:{tendencia_cor};">
-                {tendencia_msg}
-            </div>
-            """,
+        col4.markdown(
+            f"<div class='indicador-box' style='background:{cor}cc;'>{icon}<br>{info['tendencia_mercado']}<br><small>Mercado</small></div>",
             unsafe_allow_html=True
         )
 
-else:
-    st.error("Erro ao carregar a base de dados CSV.")
+        # Projeções salariais
+        anos = ["+5 anos", "+10 anos", "+15 anos", "+20 anos"]
+        valores = [info["previsao_5"], info["previsao_10"], info["previsao_15"], info["previsao_20"]]
 
-# Rodapé
-st.markdown(
-    "<br><div class='footer'>© 2025 Jobin Analytics | Powered by Streamlit</div>",
-    unsafe_allow_html=True
-)
+        crescimento = ((valores[-1] - valores[0]) / valores[0]) * 100
+
+        if crescimento > 15:
+            mensagem = f"🚀 Crescimento Acelerado ({crescimento:.1f}%)"
+            cor_t = "#00e676"
+        elif crescimento > 2:
+            mensagem = f"📈 Crescimento Moderado ({crescimento:.1f}%)"
+            cor_t = "#ffeb3b"
+        elif crescimento > -2:
+            mensagem = f"⚖️ Estável ({crescimento:.1f}%)"
+            cor_t = "#ffffff"
+        else:
+            mensagem = f"📉 Queda Salarial ({crescimento:.1f}%)"
+            cor_t = "#ff5252"
+
+        fig = go.Figure(go.Scatter(x=anos, y=valores, mode="lines+markers", line=dict(width=4)))
+        fig.update_layout(title="Evolução Salarial", template="plotly_white")
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.markdown(
+            f"<div class='tendencia' style='background:{cor_t};'>{mensagem}</div>",
+            unsafe_allow_html=True
+        )
+
+st.markdown("<div class='footer'>© 2025 Jobin Analytics</div>", unsafe_allow_html=True)
