@@ -1,31 +1,74 @@
+# 📊 **Jobin – Analytics & Mercado**
 
-# 📊 Jobin – Analytics & Mercado
+### Dados, inteligência de mercado e impacto social para jovens da Região Metropolitana do Recife.
 
-**Jobin – Analytics & Mercado:** iniciativa que transforma a vida de jovens em Recife por meio de dados e inteligência de mercado.  
-Conectamos talentos a oportunidades reais de **trabalho, educação e renda**, promovendo **inclusão, acessibilidade e impacto social** com uma plataforma humana e voltada ao futuro.
+---
 
+## 🌍 **Sobre o Projeto**
 
+O **Jobin – Analytics & Mercado** é um módulo da plataforma **Jobin**, uma iniciativa social e tecnológica que apoia jovens da Região Metropolitana do Recife no acesso a **emprego**, **formação** e **geração de renda**.
 
-## 🚀 Sobre o Projeto
+Este módulo utiliza **dados do Novo CAGED, indicadores do mercado local e visualizações analíticas** para orientar decisões, apoiar políticas públicas e ampliar o impacto social da plataforma.
 
-O **Jobin** é uma plataforma social e tecnológica que conecta jovens a oportunidades de **emprego, educação e geração de renda**.  
-O módulo **Analytics & Mercado** utiliza **dados, indicadores e inteligência analítica** para compreender o mercado local e impulsionar decisões que ampliam o impacto social do Jobin.
+Ele fornece relatórios, dashboards e análises que ajudam a identificar:
 
+* áreas de maior demanda de trabalho,
+* tendências do mercado local.
 
+---
 
-## 🎯 Objetivos
+## 🎯 **Objetivos**
 
-- Analisar dados sobre o mercado de trabalho para os jovem da RMR;  
-- Gerar **insights e relatórios** para apoiar jovens a oportunidades de **emprego, educação e geração de renda**.;  
-- Promover **inclusão socioeconômica** por meio de informações acessíveis;  
-- Impulsionar o **desenvolvimento pessoal e profissional** de jovens.
+* Analisar dados do mercado de trabalho da RMR com foco em jovens.
+* Gerar insights acessíveis que ajudem jovens a buscar oportunidades reais.
+* Embasar decisões estratégicas do Jobin com inteligência analítica.
+* Promover inclusão socioeconômica por meio de informação clara e aberta.
+* Fortalecer o desenvolvimento profissional e a empregabilidade juvenil.
 
+---
 
+## 🧩 **Funcionalidades Principais**
 
-## 🧠 Tecnologias Utilizadas
+* 📊 Visualização interativa de dados (Streamlit)
+* 🔎 Filtros por setor, município, faixa etária e categoria profissional
+* 🧠 Insights automáticos com base em indicadores locais
+* 📈 Tendências de contratação e empregabilidade
+* 📥 Importação de dados do Novo CAGED
+* 🔗 Integração com a plataforma Jobin (via API / Lumi SDK)
 
-| Categoria | Ferramentas |
-|------------|--------------|
-| **Análise de Dados** | Python · Pandas · NumPy · etc |
-| **Visualização** | streamlit |
+---
 
+## 🛠️ **Tecnologias Utilizadas**
+
+**Backend / Dados**
+
+* Python
+* Pandas
+* Lumi SDK
+* MongoDB (via Lumi)
+
+**Frontend / Dashboard**
+
+* Streamlit
+* Plotly / Matplotlib / Altair (a depender da versão)
+
+**Infraestrutura**
+
+* Streamlit Cloud (opcional)
+* GitHub Actions (CI/CD)
+
+---
+
+## 📄 **Licença**
+
+Este projeto utiliza a licença **MIT**.
+Sinta-se livre para usar, adaptar e contribuir.
+
+---
+
+## 🔗 **Links Oficiais**
+
+* 🌐 **Site Jobin:** [https://jobin-website.lumi.ing](https://jobin-website.lumi.ing)
+* 💻 **Repositório do Jobin (Website):** [https://github.com/EdnizLeandro/Jobin](https://github.com/EdnizLeandro/Jobin)
+
+---
